@@ -23,6 +23,7 @@ class SimpleDenseNet(nn.Module):
         """
         super().__init__()
 
+        self.classes = output_size
         self.model = nn.Sequential(
             nn.Linear(input_size, lin1_size),
             nn.BatchNorm1d(lin1_size),

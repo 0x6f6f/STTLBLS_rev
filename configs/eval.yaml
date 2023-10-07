@@ -4,8 +4,8 @@ defaults:
   - _self_
   - data: mnist # choose datamodule with `test_dataloader()` for evaluation
   - model: mnist
-  - logger: null
-  - trainer: default
+  - logger: tensorboard
+  - trainer: cpu
   - paths: default
   - extras: default
   - hydra: default
@@ -15,4 +15,4 @@ task_name: "eval"
 tags: ["dev"]
 
 # passing checkpoint path is necessary for evaluation
-ckpt_path: ???
+ckpt_path: /data/STTLBLS_rev/logs/train/runs/2023-09-05_20-51-40/checkpoints/epoch_005.ckpt
