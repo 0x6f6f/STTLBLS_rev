@@ -4,7 +4,7 @@
 # python train.py experiment=example
 
 defaults:
-  - override /data: cifar10
+  - override /data: svhn
   - override /model: bls
   - override /callbacks: default
   - override /trainer: default
@@ -12,7 +12,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["cifar10", "bls"]
+tags: ["svhn", "bls"]
 
 seed: 74089
 
@@ -29,17 +29,17 @@ model:
     num_classes: 10
     fb_depth: 3
     fb_cnt: 3
-    filters: [128, 160, 192]
+    filters: [128, 256, 320]
     overall_dropout: 0.1
-    block_dropout: [0.1, 0.1, 0.1]
+    block_dropout: [0.1, 0.2, 0.2]
   compile: false
 
 data:
-  batch_size: 192
+  batch_size: 256
 
 logger:
   wandb:
     tags: ${tags}
-    group: "cifar10"
+    group: "svhn"
   aim:
-    experiment: "cifar10"
+    experiment: "svhn"

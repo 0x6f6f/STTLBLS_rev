@@ -1,0 +1,7 @@
+_target_: src.data.cifar100_datamodule.CIFAR100DataModule
+data_dir: ${paths.data_dir}
+batch_size: 128
+# 50000 training images and 10000 test images, we split it into 11:1:2
+train_val_test_split: [47_136, 9_648, 3_216]
+num_workers: 4
+pin_memory: False

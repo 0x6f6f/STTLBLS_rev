@@ -1,0 +1,7 @@
+_target_: src.data.svhn_datamodule.SVHNDataModule
+data_dir: ${paths.data_dir}
+batch_size: 256
+# 73257 training images and 26032 test images, we split it into 11:1:2
+train_val_test_split: [78_012, 7_092, 14_185]
+num_workers: 4
+pin_memory: False

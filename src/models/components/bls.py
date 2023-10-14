@@ -155,6 +155,15 @@ class SwiftFormerEncoder(nn.Module):
     It consists of (1) Local representation module, (2) EfficientAdditiveAttention, and (3) MLP block.
     Input: tensor in shape [B, C, H, W]
     Output: tensor in shape [B, C, H, W]
+
+    Args:
+        dim (int): The number of input channels.
+        mlp_ratio (float): The ratio of the hidden size of the MLP layer to the input size.
+        act_layer (nn.Module): The activation function to use in the MLP layer.
+        drop (float): The dropout probability to use in the MLP layer.
+        drop_path (float): The dropout probability to use in the residual connection.
+        use_layer_scale (bool): Whether to use layer scale in the residual connection.
+        layer_scale_init_value (float): The initial value of the layer scale parameter.
     """
 
     def __init__(
@@ -192,7 +201,14 @@ class SwiftFormerEncoder(nn.Module):
             )
 
     def forward(self, x):
-        """Additive encoder block."""
+        """Additive encoder block.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+        """
         x = self.local_representation(x)
         B, C, H, W = x.shape
         if self.use_layer_scale:
@@ -215,9 +231,13 @@ class SwiftFormerEncoder(nn.Module):
 
 
 class h_sigmoid(nn.Module):
-    """Hard sigmoid function.
+    """Applies the hard sigmoid function element-wise.
 
-    provides better ability of activating.
+    The hard sigmoid function is defined as:
+    relu(x + 3) / 6
+
+    Args:
+        inplace (bool, optional): If set to True, will modify the input tensor in-place. Default: True.
     """
 
     def __init__(self, inplace=True):
@@ -225,9 +245,7 @@ class h_sigmoid(nn.Module):
         self.relu = nn.ReLU6(inplace=inplace)
 
     def forward(self, x):
-        """
-        implementation: relu(x+3)/6
-        """
+        """Applies the hard sigmoid function element-wise."""
         return self.relu(x + 3) / 6
 
 
@@ -375,6 +393,7 @@ class GDBLS(nn.Module):
         _log_api_usage_once(self)
 
         assert len(filters) == fb_cnt
+        assert len(block_dropout) == fb_cnt
 
         self.fb_cnt = fb_cnt
         self.num_classes = num_classes
@@ -397,7 +416,7 @@ class GDBLS(nn.Module):
                 planes=filters[i],
                 dropout_rate=block_dropout[i],
                 conv_cnt=fb_depth,
-                islast=False if i < fb_cnt - 1 else True,
+                islast=False if i != fb_cnt - 1 else True,
                 down_gap=self.gap,
             )
             for i in range(fb_cnt)
@@ -431,7 +450,7 @@ class GDBLS(nn.Module):
             nn.Flatten(),
             nn.ReLU(inplace=True),
             nn.Dropout(overall_dropout),
-            nn.Linear(filters[2], self.num_classes),
+            nn.Linear(filters[-1], self.num_classes),
         )
 
         self.init_weights()
