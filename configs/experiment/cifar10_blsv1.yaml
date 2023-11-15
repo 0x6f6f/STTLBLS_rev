@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: cifar10
-  - override /model: bls
+  - override /model: bls_v1
   - override /callbacks: default
   - override /trainer: default
 
@@ -25,17 +25,16 @@ model:
   optimizer:
     lr: 0.0005
   net:
-    input_shape: [3, 32, 32]
     num_classes: 10
-    fb_depth: 3
-    fb_cnt: 3
-    filters: [160, 160, 192]
-    overall_dropout: 0.5
-    block_dropout: [0.1, 0.1, 0.1]
+    input_channels: 3
+    filters: [128, 160, 192]
+    num_layers: 3
+    dropout_rate: 0.5
+    block_drop_rate: 0.1
   compile: false
 
 data:
-  batch_size: 256
+  batch_size: 160
 
 logger:
   wandb:

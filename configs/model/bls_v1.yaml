@@ -14,11 +14,13 @@ scheduler:
   patience: 10
 
 net:
-  _target_: src.models.components.bls.GDBLS
-  input_shape: [3, 32, 32]
-  fb_depth: 5
+  _target_: src.models.components.bls_v1.GDBLS
+  num_classes: 10
+  input_channels: 3
   filters: [128, 160, 192]
-  overall_dropout: 0.1
+  num_layers: 4
+  dropout_rate: 0.5
+  block_drop_rate: 0.1
 
 # compile model for faster training with pytorch 2.0
 compile: true

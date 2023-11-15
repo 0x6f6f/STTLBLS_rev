@@ -383,9 +383,9 @@ class GDBLS(nn.Module):
         num_classes: int = 10,
         input_shape: List[int] = [3, 32, 32],
         fb_cnt=3,
-        fb_depth=3,
-        filters: List[int] = [64, 128, 256],
-        block_dropout: List[float] = [0.5, 0.5, 0.5],
+        fb_depth=5,
+        filters: List[int] = [128, 160, 192],
+        block_dropout: List[float] = [0.1, 0.1, 0.1],
         overall_dropout: float = 0.5,
         **kwargs,
     ) -> None:
@@ -441,7 +441,9 @@ class GDBLS(nn.Module):
                     bias=False,
                 ),
             )
-            for i in range(fb_cnt - 1)
+            if i != fb_cnt - 1
+            else nn.Identity()
+            for i in range(fb_cnt)
         )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -494,7 +496,7 @@ class GDBLS(nn.Module):
         """
         x = self.input_layer(x)
         ps = self.forward_features(x)
-        ps = [self.aligners[i](x) for i, x in enumerate(ps[:-1])]
+        ps = [self.aligners[i](x) for i, x in enumerate(ps)]
         out = self.avgpool(sum(ps))
         out = self.head(out)
         return out
