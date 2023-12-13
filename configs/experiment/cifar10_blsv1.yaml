@@ -25,12 +25,12 @@ model:
   optimizer:
     lr: 0.0005
   net:
-    num_classes: 10
-    input_channels: 3
-    filters: [128, 160, 192]
-    num_layers: 3
-    dropout_rate: 0.5
-    block_drop_rate: 0.1
+    num_classes: 10,
+    input_shape: (3,32,32),
+    filters: [128,160,192],
+    num_heads: [1,2,4],
+    block_drop: 0.1,
+    overall_drop: 0.1
   compile: false
 
 data:
