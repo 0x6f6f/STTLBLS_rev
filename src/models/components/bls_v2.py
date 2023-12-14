@@ -277,7 +277,7 @@ class ECALayer(nn.Module):
         return x * y.expand_as(x)
 
 def convx(inchans, outchans, ksize, bias=False):
-    return nn.Conv2d(inchans,outchans,ksize,padding=(ksize-1)/2,bias=bias)
+    return nn.Conv2d(inchans,outchans,ksize,padding=(ksize-1)//2,bias=bias)
 
 def conv1x1(inchans, outchans, bias=False):
     return convx(inchans,outchans,1,bias)
@@ -313,19 +313,19 @@ class FeatureBlock(nn.Module):
         out_channels,
         drop_rate
     ):
-        super()._init__()
+        super().__init__()
         self.expansion=1
 
         self.hidden_dims = out_channels*self.expansion
         self.forward_layers = nn.Sequential(
             *[
                 nn.Sequential(
-                    conv3x3(in_channels, self.hidden_dims),
+                    conv3x3(in_channels if i==0 else self.hidden_dims, self.hidden_dims),
                     nn.BatchNorm2d(self.hidden_dims),
                     nn.ReLU(inplace=True),
                     nn.Dropout(drop_rate)
                 )
-                for _ in range(4)
+                for i in range(4)
             ]
         )
         self.post_conv = conv3x3(self.hidden_dims, out_channels, bias=True)
@@ -346,27 +346,56 @@ class FeatureBlock(nn.Module):
         x = self.post_conv(x)
         x = self.post_act(x)
 
+        B,C,H,W = x.shape
         # channelwise attention 
         x = torch.multiply(
-            x,
-            self.pool(x, self.post_conv.bias)
+            self.pool(x, self.post_conv.bias).view(B,C,1,1),
+            x
         )
 
         # block level output
         x = self.downsample(x)
         return self.block_drop(x)
-    
+
+class EncoderWrapper(nn.Module):
+    def __init__(self,dim,num_heads,drop) -> None:
+        super().__init__()
+        self.encoder_layer1 = Encoder(
+            dim=dim,
+            num_heads=num_heads,
+            mlp_ratio=4,
+            qkv_bias=True,
+            drop=drop,
+            attn_drop=drop,
+            drop_path=drop
+        )   
+        self.encoder_layer2 = Encoder(
+            dim=dim,
+            num_heads=num_heads,
+            mlp_ratio=4,
+            qkv_bias=True,
+            drop=drop,
+            attn_drop=drop,
+            drop_path=drop
+        )   
+    def forward(self,x,B,H,W):
+        x = x.flatten(2).transpose(1, 2)
+        x = self.encoder_layer1(x,B,H,W)
+        x = x.flatten(2).transpose(1, 2)
+        x = self.encoder_layer2(x,B,H,W)
+        return x
+
 class GDBLS(nn.Module):
     def __init__(
         self,
         num_classes=10,
-        input_shape=(3,32,32),
+        input_shape=[3,32,32],
         filters=[128,160,192],
         num_heads=[1,2,4],
         block_drop=0.1,
         overall_drop=0.5
     ):
-        super()._init__()
+        super().__init__()
 
         assert len(filters) == len(num_heads)
 
@@ -383,23 +412,18 @@ class GDBLS(nn.Module):
         ])
 
         self.local_attn_blocks = nn.ModuleList([
-            nn.Sequential(
-                *[Encoder(
-                    dim=filters[i],
-                    num_heads=num_heads[i],
-                    mlp_ratio=4,
-                    qkv_bias=True,
-                    drop=block_drop,
-                    attn_drop=block_drop,
-                    drop_path=block_drop,
-                )]*2 
-            ) for i in range(self.block_cnt)
+            EncoderWrapper(
+                dim=filters[i],
+                num_heads=num_heads[i],
+                drop=block_drop,
+            )   
+            for i in range(self.block_cnt)
         ])
         
         # wrappers to resize each output into the shape of the last featureblock output
         self.size_wrapper = nn.ModuleList([
             nn.Sequential(
-                *[nn.AvgPool2d(2**(self.block_cnt-1-i)),conv1x1(filters[i],filters[-1])] if i!=self.block_cnt-1 else nn.Identity(),
+                *[nn.AvgPool2d(2**(self.block_cnt-1-i)),conv1x1(filters[i],filters[-1])] if i!=self.block_cnt-1 else [nn.Identity()],
                 nn.Flatten(start_dim=1),
             ) for i in range(self.block_cnt)
         ])
@@ -408,7 +432,7 @@ class GDBLS(nn.Module):
 
         wrapped_size = H // (2**self.block_cnt)
         self.cls_head = nn.Linear(
-            (filters[-1]*wrapped_size*wrapped_size, self.num_classes)
+            filters[-1]*wrapped_size*wrapped_size, self.num_classes
         )
 
         for m in self.modules():
@@ -427,8 +451,38 @@ class GDBLS(nn.Module):
         ps = []
         for i in range(self.block_cnt):
             x = self.fb_blocks[i](x if i == 0 else ps[i - 1])
-            x = self.local_attn_blocks[i](x)
+            B,C,H,W = x.shape
+            x = self.local_attn_blocks[i](x,B,H,W)
             ps.append(x)
         ps = [self.size_wrapper[i](x) for i, x in enumerate(ps)]
         e_ps = self.enhance_block(sum(ps))
         return self.cls_head(e_ps)
+    
+if __name__ == "__main__":
+
+    # Define a function for testing the FeatureBlock module
+    def test_feature_block():
+        # Set random seed for reproducibility
+        torch.manual_seed(42)
+
+        # Create an instance of FeatureBlock
+        in_channels = 3  # Replace with your input channels
+        out_channels = 64  # Replace with your output channels
+        drop_rate = 0.5  # Replace with your desired drop rate
+        feature_block = FeatureBlock(in_channels, out_channels, drop_rate)
+
+        # Create a random input tensor
+        batch_size = 32  # Replace with your desired batch size
+        input_tensor = torch.randn((batch_size, in_channels, 256, 256))  # Adjust input size as needed
+
+        # Forward pass
+        output = feature_block(input_tensor)
+
+        # Print the output shape
+        print("Output Shape:", output.shape)
+
+        # Perform any additional assertions or checks as needed
+        assert output.shape[1] == out_channels  # Ensure the output has the correct number of channels
+
+    # Run the test function
+    test_feature_block()
