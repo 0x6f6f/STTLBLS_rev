@@ -241,40 +241,6 @@ class Encoder(nn.Module):
         x = x.reshape(batchsize, H, W, -1).permute(0, 3, 1, 2).contiguous()
         return x
 
-class h_sigmoid(nn.Module):
-    """Applies the hard sigmoid function element-wise.
-
-    The hard sigmoid function is defined as:
-    relu(x + 3) / 6
-
-    Args:
-        inplace (bool, optional): If set to True, will modify the input tensor in-place. Default: True.
-    """
-
-    def __init__(self, inplace=True):
-        super().__init__()
-        self.relu = nn.ReLU6(inplace=inplace)
-
-    def forward(self, x):
-        """Applies the hard sigmoid function element-wise."""
-        return self.relu(x + 3) / 6
-
-
-class ECALayer(nn.Module):
-    """Effective Channel Attention."""
-
-    def __init__(self, k_size=3):
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
-        self.sigmoid = h_sigmoid()
-
-    def forward(self, x):
-        """ECA layer is very close to MLP but with a representation to 1d form."""
-        y = self.avg_pool(x)
-        y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
-        y = self.sigmoid(y)
-        return x * y.expand_as(x)
 
 def convx(inchans, outchans, ksize, bias=False):
     return nn.Conv2d(inchans,outchans,ksize,padding=(ksize-1)//2,bias=bias)
@@ -448,18 +414,23 @@ class GDBLS(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
+        cur_tensor = x
         ps = []
         for i in range(self.block_cnt):
-            x = self.fb_blocks[i](x if i == 0 else ps[i - 1])
-            B,C,H,W = x.shape
-            x = self.local_attn_blocks[i](x,B,H,W)
-            ps.append(x)
-        ps = [self.size_wrapper[i](x) for i, x in enumerate(ps)]
+            # forward each featuremap
+            cur_tensor = self.fb_blocks[i](cur_tensor)
+            # add local attn
+            B,C,H,W = cur_tensor.shape
+            cur_tensor = self.local_attn_blocks[i](cur_tensor,B,H,W)
+            # align size
+            ps.append(self.size_wrapper[i](cur_tensor))
+
         e_ps = self.enhance_block(sum(ps))
         return self.cls_head(e_ps)
     
 if __name__ == "__main__":
-
+    model = GDBLS()
+    print(model)
     # Define a function for testing the FeatureBlock module
     def test_feature_block():
         # Set random seed for reproducibility

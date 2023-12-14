@@ -4,7 +4,7 @@ import torch
 from lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.datasets import CIFAR10
-from torchvision.transforms import transforms
+from torchvision.transforms import transforms, AutoAugment, AutoAugmentPolicy
 
 
 class CIFAR10DataModule(LightningDataModule):
@@ -37,17 +37,16 @@ class CIFAR10DataModule(LightningDataModule):
         self.transforms = [
             transforms.Compose(
                 [
+                    AutoAugment(AutoAugmentPolicy.CIFAR10),
                     transforms.ToTensor(),
-                    transforms.Normalize(mean, std),
-                    transforms.RandomCrop(size, padding=4),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomErasing(p=0.5),
+                    transforms.RandomErasing(),
+                    transforms.RandomGrayscale(p = 0.35)
                 ]
             ),
             transforms.Compose(
                 [
+                    AutoAugment(AutoAugmentPolicy.CIFAR10),
                     transforms.ToTensor(),
-                    transforms.Normalize(mean, std),
                 ]
             ),
         ]
